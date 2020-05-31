@@ -1,0 +1,113 @@
+<head>
+    <title>Period Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="icon" type="image/png" href="./22905-6-health-file_600x600.png" />
+    <link rel="apple-touch-icon" href= "./22905-6-health-file_600x600.png">
+    </head>
+    <body>
+    <table class="w3-table-all"><tr><th>Start</th><th>End</th><th>Delete</th></tr></table>
+    <div class="w3-bottom w3-xxxlarge">
+    <div class="start w3-bar w3-mobile w3-red w3-center" onclick="toggle_isP()">Mark Period Start</div>
+    <div class="stop w3-hide w3-bar w3-mobile w3-red w3-center" onclick="toggle_isP()">Mark Period End</div>
+    </div>
+    </body>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/moment@2.26.0/moment.min.js'></script>
+    <script>
+
+    function mark_start() {
+        const today = moment().format("M/D/YY");
+        const split = localStorage.periods.split(',').filter(el => el);
+        split.unshift(`${today}-`);
+        localStorage.periods = split;
+    }
+
+    function mark_end() {
+        const split = localStorage.periods.split(',').filter(el => el);
+        const last = split[0];
+        const today = moment().format("M/D/YY");
+        split[0] = `${last}${today}`
+        localStorage.periods = split;
+    }
+    
+    function toggle_isP() {
+        if (localStorage.isP != 1) {
+            mark_start();
+        } else {
+            mark_end();
+        }
+        localStorage.isP = localStorage.isP == 1 ? 0 : 1;
+        render_button();
+        render_table();
+    }
+    
+    async function render_button(){
+        if (localStorage.isP == 1) {
+            $(".stop").removeClass("w3-hide");
+            $(".start").addClass("w3-hide");
+        } else {
+            $(".start").removeClass("w3-hide");
+            $(".stop").addClass("w3-hide");
+        }
+    }
+
+    function delete_element(element) {
+        let split = localStorage.periods.split(",");
+        const index = split.indexOf(element);
+        if (index > -1) {
+            split[index] = '';
+            split = split.filter(el => el);
+        }
+        localStorage.periods = split;
+        render_table();
+    }
+    
+    async function render_table() {
+        $(".tr").remove();
+        const {periods} = localStorage;
+        const splitPeriods = periods.split(',').filter(el => el);
+        const parsed = splitPeriods.map(period => {
+            const split = period.split('-');
+            const start = split[0];
+            const end = split[1] || '';
+            const startMoment = moment(start, "M/D/YY");
+            let endFormatted = "current";
+            if (end.trim().length) {
+                const endMoment = moment(end, "M/D/YY");
+                endFormatted = endMoment.format("dddd, MMMM Do");
+            }
+            const startFormatted = startMoment.format("dddd, MMMM Do");
+            return {
+                start: startFormatted,
+                end: endFormatted,
+                text: period
+            }
+        })
+        let tableData = '';
+        parsed.forEach(period => {
+            const className = period.end == "current" ? "w3-pale-red" : "";
+            tableData += `<tr class='${className} tr'><td>${period.start}</td><td>${period.end}</td><td onclick="delete_element('${period.text}')">X</td></tr>`;
+        });
+        $("tbody")[0].innerHTML += tableData;
+    }
+
+    function restart() {
+        localStorage.periods = '';
+        localStorage.isP = 0;
+        render_button();
+        render_table();
+    }
+    
+    function main() {
+        if (!localStorage.periods) {
+            localStorage.periods = '';
+        }
+        render_button();
+        render_table();
+    }
+    
+    main();
+    </script>
+    

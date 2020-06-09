@@ -2,26 +2,188 @@
     <title>Period Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
     <link rel="icon" type="image/png" href="./calendar.png" />
-    <link rel="apple-touch-icon" href= "./calendar.png">
-    </head>
-    <body>
-    <table class="w3-table-all"><tr><th>Start</th><th>End</th><th>Delete</th></tr></table>
+    <link rel="apple-touch-icon" href="./calendar.png">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <style>
+        .bd-placeholder-img {
+            font-size: 1.125rem;
+            text-anchor: middle;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        @media (min-width: 768px) {
+            .bd-placeholder-img-lg {
+                font-size: 3.5rem;
+            }
+        }
+
+        html,
+        body.signin {
+            height: 100%;
+        }
+
+        body.signin {
+            display: -ms-flexbox;
+            display: flex;
+            -ms-flex-align: center;
+            align-items: center;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+        }
+
+        .form-signin {
+            width: 100%;
+            max-width: 330px;
+            padding: 15px;
+            margin: auto;
+        }
+
+        .form-signin .checkbox {
+            font-weight: 400;
+        }
+
+        .form-signin .form-control {
+            position: relative;
+            box-sizing: border-box;
+            height: auto;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .form-signin .form-control:focus {
+            z-index: 2;
+        }
+
+        .form-signin input[type="email"] {
+            margin-bottom: -1px;
+            border-bottom-right-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .form-signin input[type="password"] {
+            margin-bottom: 10px;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+        }
+    </style>
+</head>
+
+<body class="text-center signin">
+    <form class="form-signin">
+        <h1 class="h3 mb-3 font-weight-normal">Authenticate</h1>
+        <label for="inputPassword" class="sr-only">Password</label>
+        <input type="password" id="password" class="form-control" placeholder="Password" required>
+        <button class="btn btn-lg btn-primary btn-block" type="submit" onclick="login()">Sign in</button>
+        <p class="mt-5 mb-3 text-muted">&copy; 2017-2020</p>
+    </form>
+    <table class="table table-striped">
+        <tr>
+            <th scope="col">Start</th>
+            <th scope="col">End</th>
+            <th scope="col">Delete</th>
+        </tr>
+        <tr class="tr">
+            <td>Otto</td>
+            <td>@mdo</td>
+            <td>X</td>
+        </tr>
+        <tr class="tr">
+            <td>Thornton</td>
+            <td>@fat</td>
+            <td>X</td>
+        </tr>
+        <tr class="tr">
+            <td>the Bird</td>
+            <td>@twitter</td>
+            <td>X</td>
+        </tr>
+    </table>
     <div class="w3-bottom w3-xxxlarge">
-    <div class="start w3-bar w3-mobile w3-red w3-center" onclick="toggle_isP()">Mark Period Start</div>
-    <div class="stop w3-hide w3-bar w3-mobile w3-red w3-center" onclick="toggle_isP()">Mark Period End</div>
+        <div class="start w3-bar w3-mobile w3-red w3-center" onclick="mark_start()">Mark Period Start</div>
+        <div class="stop w3-bar w3-mobile w3-red w3-center" onclick="mark_end()">Mark Period End</div>
     </div>
-    </body>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src='https://cdn.jsdelivr.net/npm/moment@2.26.0/moment.min.js'></script>
-    <script>
+</body>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/moment@2.26.0/moment.min.js'></script>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js"></script>
+<script>
+
+    function login() {
+        const password = $("#password")[0].value.trim();
+        const split = password.split(":");
+        const access = split[0];
+        const secret = split[1];
+        localStorage.access = access;
+        localStorage.secret = secret;
+        authenticate();
+    }
+
+    function authenticate() {
+        AWS.config.update({ region: 'us-west-2' });
+        AWS.config.accessKeyId = localStorage.access;
+        AWS.config.secretAccessKey = localStorage.secret;
+        var ddb = new AWS.DynamoDB();
+        var params = {
+            TableName: 'main',
+            Key: {
+                'key': { S: 'periods' }
+            },
+        };
+        ddb.getItem(params, function (err, data) {
+            if (err) {
+                $("#wrong-pw").show();
+            } else {
+                $("body").removeClass("signin");
+                $("body").css({ margin: "25px" })
+                $("form.form-signin").hide();
+                localStorage.periods = data.Item.value.S;
+                render_periods();
+            }
+        });
+    }
+
+    async function sync() {
+        let split = localStorage.periods.split(",").filter(el => el);
+        split = split.slice(0, 12);
+        const joined = split.join(",");
+        localStorage.periods = joined;
+        const docClient = new AWS.DynamoDB.DocumentClient();
+        var params = {
+            TableName: "main",
+            Key: {
+                "key": "periods"
+            },
+            UpdateExpression: "set #t1 = :v",
+            ExpressionAttributeValues: {
+                ":v": joined
+            },
+            ExpressionAttributeNames: {
+                "#t1": "value"
+            },
+            ReturnValues: "UPDATED_NEW"
+        };
+        docClient.update(params, function (err, data) {
+            if (err) {
+                console.error("Unable to update item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                ;
+            }
+        });
+    }
 
     function mark_start() {
         const today = moment().format("M/D/YY");
         const split = localStorage.periods.split(',').filter(el => el);
         split.unshift(`${today}-`);
         localStorage.periods = split;
+        sync();
+        render_periods();
     }
 
     function mark_end() {
@@ -30,27 +192,8 @@
         const today = moment().format("M/D/YY");
         split[0] = `${last}${today}`
         localStorage.periods = split;
-    }
-    
-    function toggle_isP() {
-        if (localStorage.isP != 1) {
-            mark_start();
-        } else {
-            mark_end();
-        }
-        localStorage.isP = localStorage.isP == 1 ? 0 : 1;
-        render_button();
-        render_table();
-    }
-    
-    async function render_button(){
-        if (localStorage.isP == 1) {
-            $(".stop").removeClass("w3-hide");
-            $(".start").addClass("w3-hide");
-        } else {
-            $(".start").removeClass("w3-hide");
-            $(".stop").addClass("w3-hide");
-        }
+        sync();
+        render_periods();
     }
 
     function delete_element(element) {
@@ -61,12 +204,23 @@
             split = split.filter(el => el);
         }
         localStorage.periods = split;
-        render_table();
+        sync();
+        render_periods();
     }
-    
+
+    async function render_button() {
+        if (localStorage.periods.includes("-,") || localStorage.periods[localStorage.periods.length - 1] == "-") {
+            $(".start").hide();
+            $(".stop").show();
+        } else {
+            $(".start").show();
+            $(".stop").hide();
+        }
+    }
+
     async function render_table() {
         $(".tr").remove();
-        const {periods} = localStorage;
+        const { periods } = localStorage;
         const splitPeriods = periods.split(',').filter(el => el);
         const parsed = splitPeriods.map(period => {
             const split = period.split('-');
@@ -91,23 +245,25 @@
             tableData += `<tr class='${className} tr'><td>${period.start}</td><td>${period.end}</td><td onclick="delete_element('${period.text}')">X</td></tr>`;
         });
         $("tbody")[0].innerHTML += tableData;
+        $("table").show();
     }
 
-    function restart() {
-        localStorage.periods = '';
-        localStorage.isP = 0;
-        render_button();
+    function render_periods() {
         render_table();
+        render_button();
     }
-    
+
     function main() {
-        if (!localStorage.periods) {
-            localStorage.periods = '';
+        $("table, .start, .stop").hide();
+        $('#wrong-pw').hide();
+        if (localStorage.access && localStorage.secret) {
+            $("form.form-signin").hide();
+            authenticate();
+        } else {
+            $("form.form-signin").show();
         }
-        render_button();
-        render_table();
     }
-    
+
     main();
-    </script>
-    
+
+</script>

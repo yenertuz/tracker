@@ -79,6 +79,7 @@
         <h1 class="h3 mb-3 font-weight-normal">Authenticate</h1>
         <label for="inputPassword" class="sr-only">Password</label>
         <input type="password" id="password" class="form-control" placeholder="Password" required>
+        <p style="display:none;" class="w3-text-red" id="wrong-pw">Wrong Password</p>
         <button class="btn btn-lg btn-primary btn-block" type="submit" onclick="login()">Sign in</button>
         <p class="mt-5 mb-3 text-muted">&copy; Yener Tuz 2020</p>
     </form>
@@ -115,10 +116,10 @@
 <script>
 
     function login() {
-        const password = $("#password")[0].value.trim();
+         const password = $("#password")[0].value.trim();
         const split = password.split(":");
-        const access = split[0];
-        const secret = split[1];
+        const access = split[0] || "";
+        const secret = split[1] || "";
         localStorage.access = access;
         localStorage.secret = secret;
         authenticate();
@@ -137,10 +138,11 @@
         };
         ddb.getItem(params, function (err, data) {
             if (err) {
+                console.log(err);
+                restart();
                 $("#wrong-pw").show();
             } else {
                 $("body").removeClass("signin");
-                $("body").css({ margin: "25px" })
                 $("form.form-signin").hide();
                 localStorage.periods = data.Item.value.S;
                 render_periods();
@@ -252,8 +254,15 @@
         render_table();
         render_button();
     }
+    
+    function restart() {
+    	delete localStorage.access;
+    	delete localStorage.secret;
+    	main();
+    }
 
     function main() {
+    	const params = new URLSearchParams(window.location.search);
         $("table, .start, .stop").hide();
         $('#wrong-pw').hide();
         if (localStorage.access && localStorage.secret) {
@@ -261,6 +270,11 @@
             authenticate();
         } else {
             $("form.form-signin").show();
+        }
+        if (params.has("code")) {
+        	const code = params.get("code");
+        	$("#password")[0].value = code;
+        	login();
         }
     }
 
